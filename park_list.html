@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>香港郊野公園 · 設施壓力檢測站 | Country Park Facility Pressure Checker</title>
+    <!-- PapaParse for CSV parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'PingFang HK', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+            min-height: 100vh;
+            padding: 30px 20px;
+            position: relative;
+        }
+        
+        /* 背景圖片層 (全頁背景，透明度15%) */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: url('https://upload.wikimedia.org/wikipedia/commons/d/d6/Sai_Kung_West_Country_Park_Wan_Tsai_Ext_1.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            opacity: 0.15;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .container {
+            max-width: 750px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        /* 語言切換按鈕 - 白底綠字 */
+        .lang-switch {
+            position: absolute;
+            top: -10px;
+            right: 0;
+            background: white;
+            color: #1b5e20;
+            border: 2px solid #1b5e20;
+            border-radius: 50px;
+            padding: 10px 24px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            z-index: 20;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+            letter-spacing: 1px;
+        }
+        .lang-switch:hover {
+            background: #1b5e20;
+            color: white;
+            transform: scale(1.02);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+        }
+
+        /* 標題區 */
+        .header {
+            background: #1b5e20;
+            color: white;
+            padding: 30px 25px;
+            border-radius: 32px 32px 32px 32px;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 0.9rem;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #ff8f00;
+            padding: 4px 12px;
+            border-radius: 40px;
+            font-size: 0.7rem;
+            margin-top: 12px;
+        }
+
+        /* 篩選卡片 */
+        .selector-card {
+            background: white;
+            border-radius: 28px;
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+        }
+
+        .filter-group {
+            margin-bottom: 20px;
+        }
+
+        .selector-label {
+            font-weight: 700;
+            color: #2e7d32;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1rem;
+        }
+
+        select {
+            width: 100%;
+            padding: 14px 18px;
+            font-size: 1rem;
+            border: 2px solid #c8e6c9;
+            border-radius: 60px;
+            background: white;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 500;
+            transition: 0.2s;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #2e7d32;
+        }
+
+        .campsite-selector {
+            margin-top: 8px;
+        }
+
+        /* 壓力儀表 */
+        .gauge-card {
+            background: white;
+            border-radius: 28px;
+            padding: 24px;
+            margin-bottom: 24px;
+            text-align: center;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+        }
+
+        .pressure-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #444;
+            letter-spacing: 1px;
+        }
+
+        .pressure-value {
+            font-size: 3.2rem;
+            font-weight: 800;
+            margin: 10px 0;
+        }
+
+        .pressure-bar {
+            background: #e0e0e0;
+            border-radius: 20px;
+            height: 28px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+
+        .pressure-fill {
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease;
+            border-radius: 20px;
+        }
+
+        .pressure-status {
+            font-weight: 700;
+            margin-top: 12px;
+            font-size: 1rem;
+        }
+
+        /* 數據表格 */
+        .stats-card {
+            background: white;
+            border-radius: 28px;
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+        }
+
+        .stats-title {
+            font-weight: 700;
+            color: #1b5e20;
+            margin-bottom: 16px;
+            font-size: 1.2rem;
+            border-left: 4px solid #ff8f00;
+            padding-left: 12px;
+        }
+
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .stats-table tr {
+            border-bottom: 1px solid #eee;
+        }
+
+        .stats-table td {
+            padding: 12px 8px;
+        }
+
+        .stats-table td:first-child {
+            font-weight: 600;
+            color: #2c3e2f;
+        }
+
+        .stats-table td:last-child {
+            text-align: right;
+            font-weight: 500;
+        }
+
+        .suggestion-box {
+            background: #fff8e1;
+            border-radius: 20px;
+            padding: 18px;
+            margin-top: 16px;
+            border-left: 4px solid #ff8f00;
+            line-height: 1.45;
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 0.7rem;
+            color: #5d6d5a;
+            margin-top: 24px;
+        }
+
+        @media (max-width: 550px) {
+            .lang-switch { padding: 6px 18px; font-size: 0.85rem; top: -5px; }
+            .container { max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- 白底綠字語言切換按鈕 -->
+    <button class="lang-switch" id="langSwitchBtn">🇬🇧 English</button>
+
+    <div class="header">
+        <h1 id="headerTitle">🏕️ 郊野公園設施壓力檢測站</h1>
+        <p id="headerSub">選擇公園 · 查看營地壓力</p>
+        <div class="badge" id="headerBadge">📊 基於漁護署2025年開放數據</div>
+    </div>
+
+    <div class="selector-card">
+        <div class="filter-group">
+            <div class="selector-label">
+                <span id="parkFilterIcon">🌳</span> <span id="parkFilterLabel">選擇郊野公園</span>
+            </div>
+            <select id="parkSelect"></select>
+        </div>
+        <div class="filter-group campsite-selector">
+            <div class="selector-label">
+                <span id="campIcon">🏕️</span> <span id="campLabel">該公園內營地</span>
+            </div>
+            <select id="campsiteSelect"></select>
+        </div>
+    </div>
+
+    <div class="gauge-card">
+        <div class="pressure-label" id="pressureLabel">📈 設施壓力指數</div>
+        <div class="pressure-value" id="pressureValue">--</div>
+        <div class="pressure-bar">
+            <div class="pressure-fill" id="pressureFill"></div>
+        </div>
+        <div class="pressure-status" id="pressureStatus"></div>
+    </div>
+
+    <div class="stats-card">
+        <div class="stats-title" id="statsTitle">🔧 設施配置</div>
+        <table class="stats-table" id="facilityTable">...</td>
+        <div class="suggestion-box" id="suggestionBox">💡 選擇營地查看分析</div>
+    </div>
+
+    <div class="footer" id="footerText">
+        📍 資料來源：漁農自然護理署 (AFCD) 開放數據<br>
+        營位數量/水源取自 Campsites.csv | 洗手間/飲水機依1.5km半徑統計 | 人氣指數參考2025年漁護署報告
+    </div>
+</div>
+
+<script>
+    // ---------- 多語言詞庫 (完整中英對照) ----------
+    const langData = {
+        zh: {
+            switchBtn: "🇬🇧 English",
+            headerTitle: "🏕️ 郊野公園設施壓力檢測站",
+            headerSub: "選擇公園 · 查看營地壓力",
+            headerBadge: "📊 基於漁護署2025年開放數據",
+            parkFilterIcon: "🌳",
+            parkFilterLabel: "選擇郊野公園",
+            campIcon: "🏕️",
+            campLabel: "該公園內營地",
+            pressureLabel: "📈 設施壓力指數",
+            statsTitle: "🔧 設施配置",
+            footer: "📍 資料來源：漁農自然護理署 (AFCD) 開放數據<br>營位數量/水源取自 Campsites.csv | 洗手間/飲水機依1.5km半徑統計 | 人氣指數參考2025年漁護署報告",
+            tentSpace: "🏕️ 營位數量",
+            waterSource: "🚰 水源類型",
+            nearbyToilets: "🚻 附近洗手間 (1.5km)",
+            nearbyWater: "🚰 附近飲水機",
+            popularity: "📊 人氣指數",
+            parkBelong: "🏞️ 所屬郊野公園",
+            suggestionPrefix: "💡 ",
+            pressureHigh: "🔴 高壓力 · 設施嚴重不足",
+            pressureMid: "🟡 中壓力 · 假日需提早到達",
+            pressureLow: "🟢 低壓力 · 設施相對充足",
+            suggestionHigh: "⚠️ 此營地設施壓力極高！假日人流眾多，洗手間和飲水機嚴重不足。強烈建議：自備足夠飲用水（每人至少2L），提早於早上10點前到達搶佔營位，並做好排隊使用洗手間的心理準備。",
+            suggestionMid: "🟡 此營地壓力中等。假日仍有排隊情況，建議自備飲用水，提早到達。平日前往體驗更佳。",
+            suggestionLow: "✅ 此營地設施相對充足，壓力較低。但仍建議假日提早規劃，享受舒適露營體驗。",
+            seasonalWaterNote: "<br><br>💧 注意：水源為季節性溪澗，乾旱季節可能缺水，務必自備足夠飲用水。",
+            unitPcs: "個",
+            waterTap: "水喉",
+            waterStream: "溪澗(季節性)",
+            waterOther: "其他",
+            defaultParkName: "所有郊野公園",
+            loadingText: "載入營地中..."
+        },
+        en: {
+            switchBtn: "🇭🇰 中文",
+            headerTitle: "🏕️ Country Park Facility Pressure Checker",
+            headerSub: "Select Park · View Campsite Pressure",
+            headerBadge: "📊 Based on AFCD 2025 Open Data",
+            parkFilterIcon: "🌳",
+            parkFilterLabel: "Select Country Park",
+            campIcon: "🏕️",
+            campLabel: "Campsites in this Park",
+            pressureLabel: "📈 Facility Pressure Index",
+            statsTitle: "🔧 Facility Configuration",
+            footer: "📍 Source: AFCD Open Data<br>Campsite capacity/water from Campsites.csv | Toilets/Water Dispensers within 1.5km radius | Popularity index based on 2025 AFCD report",
+            tentSpace: "🏕️ Tent Spaces",
+            waterSource: "🚰 Water Source",
+            nearbyToilets: "🚻 Nearby Toilets (1.5km)",
+            nearbyWater: "🚰 Nearby Water Dispensers",
+            popularity: "📊 Popularity Index",
+            parkBelong: "🏞️ Country Park",
+            suggestionPrefix: "💡 ",
+            pressureHigh: "🔴 High Pressure · Severely Underserved",
+            pressureMid: "🟡 Medium Pressure · Arrive early on holidays",
+            pressureLow: "🟢 Low Pressure · Adequate facilities",
+            suggestionHigh: "⚠️ This campsite faces extremely high facility pressure! On holidays toilets & water dispensers are insufficient. Bring enough water (2L/person), arrive before 10 AM, and expect toilet queues.",
+            suggestionMid: "🟡 Medium pressure. Queues possible on holidays. Bring drinking water, arrive early. Weekdays are better.",
+            suggestionLow: "✅ Low pressure, relatively adequate facilities. Still plan ahead on holidays.",
+            seasonalWaterNote: "<br><br>💧 Note: Seasonal stream water source. May dry up. Bring enough drinking water.",
+            unitPcs: "",
+            waterTap: "Tap water",
+            waterStream: "Seasonal stream",
+            waterOther: "Other",
+            defaultParkName: "All Country Parks",
+            loadingText: "Loading campsites..."
+        }
+    };
+
+    let currentLang = "zh";
+    // 資料儲存
+    let allCampsites = [];
+    let campsiteDatabase = {};
+    let parksSet = new Set();
+    let parkChineseMap = new Map();
+    let allToilets = [];
+    let allWaterDispensers = [];
+
+    // ---- 工具函數 ----
+    function calculateDistance(lat1, lng1, lat2, lng2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function calculateNearbyFacilities(camp, toilets, dispensers, radius = 1.5) {
+        let nearbyToilets = 0, nearbyWater = 0;
+        toilets.forEach(t => { if (calculateDistance(camp.lat, camp.lng, t.lat, t.lng) <= radius) nearbyToilets++; });
+        dispensers.forEach(d => { if (calculateDistance(camp.lat, camp.lng, d.lat, d.lng) <= radius) nearbyWater++; });
+        return { nearbyToilets, nearbyWater };
+    }
+
+    function calculatePressure(camp) {
+        let facilityScore = (camp.nearbyToilets * 2) + (camp.nearbyWaterDispenser * 1.5);
+        if (camp.tentValue >= 50) facilityScore += 3;
+        else if (camp.tentValue >= 30) facilityScore += 2;
+        else facilityScore += 1;
+        let pressure = (camp.popularityIndex / Math.max(1, facilityScore)) * 1.2;
+        return Math.min(100, Math.round(pressure));
+    }
+
+    function getPressureLevel(pressure) {
+        if (pressure >= 70) return "high";
+        if (pressure >= 45) return "mid";
+        return "low";
+    }
+
+    function getPressureText(level) {
+        const t = langData[currentLang];
+        if (level === "high") return t.pressureHigh;
+        if (level === "mid") return t.pressureMid;
+        return t.pressureLow;
+    }
+
+    function getDisplayParkName(parkEng) {
+        if (currentLang === "zh") {
+            return parkChineseMap.get(parkEng) || parkEng;
+        }
+        return parkEng;
+    }
+
+    function updateUIForCamp(campId) {
+        const camp = campsiteDatabase[campId];
+        if (!camp) return;
+        const pressure = calculatePressure(camp);
+        const level = getPressureLevel(pressure);
+        const pressureText = getPressureText(level);
+        const colorMap = { high: "#f44336", mid: "#ff9800", low: "#4caf50" };
+        document.getElementById("pressureValue").innerHTML = `${pressure}<span style="font-size:1rem;">/100</span>`;
+        document.getElementById("pressureFill").style.width = `${pressure}%`;
+        document.getElementById("pressureFill").style.backgroundColor = colorMap[level];
+        document.getElementById("pressureStatus").innerHTML = pressureText;
+
+        const t = langData[currentLang];
+        let tentDisplay = camp.tentSpace;
+        if (currentLang === "zh") {
+            if (camp.tentSpace === "More than 50") tentDisplay = "50+ 個";
+            else if (camp.tentSpace === "20-50") tentDisplay = "20-50 個";
+            else if (camp.tentSpace === "Less than 20") tentDisplay = "少於 20 個";
+        }
+        let waterTypeDisplay = camp.waterType;
+        if (currentLang === "en") {
+            if (camp.waterType === "水喉") waterTypeDisplay = t.waterTap;
+            else if (camp.waterType === "溪澗(季節性)") waterTypeDisplay = t.waterStream;
+            else waterTypeDisplay = t.waterOther;
+        }
+        const parkDisplay = currentLang === "zh" ? (parkChineseMap.get(camp.park) || camp.park) : camp.park;
+
+        const tableHtml = `
+            <tr><td>${t.tentSpace}</td><td>${tentDisplay}</td></tr>
+            <tr><td>${t.waterSource}</td><td>${waterTypeDisplay}</td></tr>
+            <tr><td>${t.nearbyToilets}</td><td>${camp.nearbyToilets} ${t.unitPcs}</td></tr>
+            <tr><td>${t.nearbyWater}</td><td>${camp.nearbyWaterDispenser} ${t.unitPcs}ERC20</td></tr>
+            <tr><td>${t.popularity}</td><td>${camp.popularityIndex}/100ERC20</td></tr>
+            <tr><td>${t.parkBelong}ERC20<td>${parkDisplay}ERC20</tr>
+        `;
+        document.getElementById("facilityTable").innerHTML = tableHtml;
+
+        let suggestion = "";
+        if (pressure >= 70) suggestion = t.suggestionHigh;
+        else if (pressure >= 45) suggestion = t.suggestionMid;
+        else suggestion = t.suggestionLow;
+        if (camp.waterType === "溪澗(季節性)" || (camp.waterSource && camp.waterSource.includes("STREAM"))) {
+            suggestion += t.seasonalWaterNote;
+        }
+        document.getElementById("suggestionBox").innerHTML = `${t.suggestionPrefix}${suggestion}`;
+    }
+
+    function updateCampsiteDropdown(selectedParkKey = "all") {
+        const campsiteSelect = document.getElementById("campsiteSelect");
+        let filteredCamps = [];
+        if (selectedParkKey === "all") {
+            filteredCamps = Object.values(campsiteDatabase);
+        } else {
+            filteredCamps = Object.values(campsiteDatabase).filter(c => c.park === selectedParkKey);
+        }
+        if (filteredCamps.length === 0) {
+            campsiteSelect.innerHTML = `<option disabled>${langData[currentLang].loadingText}</option>`;
+            return;
+        }
+        campsiteSelect.innerHTML = "";
+        filteredCamps.forEach(camp => {
+            const option = document.createElement("option");
+            option.value = camp.id;
+            option.textContent = camp.name;
+            campsiteSelect.appendChild(option);
+        });
+        if (filteredCamps.length > 0) {
+            campsiteSelect.value = filteredCamps[0].id;
+            updateUIForCamp(filteredCamps[0].id);
+        }
+    }
+
+    function bindParkSelectEvent() {
+        const parkSelect = document.getElementById("parkSelect");
+        parkSelect.addEventListener("change", (e) => {
+            updateCampsiteDropdown(e.target.value);
+        });
+    }
+
+    function bindCampSelectEvent() {
+        const campSelect = document.getElementById("campsiteSelect");
+        campSelect.addEventListener("change", (e) => {
+            if (e.target.value) updateUIForCamp(e.target.value);
+        });
+    }
+
+    async function loadCampsitesCSV() {
+        try {
+            const resp = await fetch('Campsites.csv.csv');
+            if (!resp.ok) throw new Error("Campsites.csv.csv not found");
+            const text = await resp.text();
+            const result = Papa.parse(text, { header: true, skipEmptyLines: true });
+            const camps = [];
+            for (const row of result.data) {
+                let lat = 0, lng = 0;
+                for (const k of Object.keys(row)) {
+                    if ((k.includes('Latitude') && k.includes('Decimal')) || k === 'Latitude') lat = parseFloat(row[k]) || 0;
+                    if ((k.includes('Longitude') && k.includes('Decimal')) || k === 'Longitude') lng = parseFloat(row[k]) || 0;
+                }
+                let name = row['Name of Building/Facility'] || row['建築物/設施名稱'] || '';
+                let park = row['Country Park'] || row['郊野公園'] || '';
+                if (lat && lng && !isNaN(lat) && !isNaN(lng) && lat !== 0 && name) {
+                    let tentSpace = row['Tent space'] || row['營位數目'] || '';
+                    let tentValue = 60;
+                    if (tentSpace.includes('Less than 20') || tentSpace.includes('少於 20')) tentValue = 15;
+                    else if (tentSpace.includes('20-50')) tentValue = 35;
+                    else if (tentSpace.includes('More than 50') || tentSpace.includes('超過 50')) tentValue = 60;
+                    let waterRaw = row['Source of water'] || row['水源'] || '';
+                    let waterType = waterRaw.includes('TAP') ? '水喉' : (waterRaw.includes('STREAM') ? '溪澗(季節性)' : '其他');
+                    camps.push({
+                        id: `${name}_${lat}_${lng}`,
+                        name: name,
+                        park: park,
+                        lat, lng,
+                        tentSpace, tentValue,
+                        waterSource: waterRaw,
+                        waterType,
+                        popularityIndex: 70
+                    });
+                    if (park) parksSet.add(park);
+                }
+            }
+            return camps;
+        } catch(e) { console.error(e); return []; }
+    }
+
+    async function loadToiletsCSV() {
+        try {
+            const resp = await fetch('Toilets.csv.csv');
+            if (!resp.ok) return [];
+            const text = await resp.text();
+            const result = Papa.parse(text, { header: true, skipEmptyLines: true });
+            const toilets = [];
+            for (const row of result.data) {
+                let lat = parseFloat(row['Latitude Decimal Degree(DD.DDD)'] || row['Latitude'] || 0);
+                let lng = parseFloat(row['Longitude Decimal Degree(DD.DDD)'] || row['Longitude'] || 0);
+                if (lat && lng && !isNaN(lat) && !isNaN(lng) && lat !== 0) {
+                    toilets.push({ lat, lng, name: row['Name of Building/Facility'] || '' });
+                }
+            }
+            return toilets;
+        } catch(e) { return []; }
+    }
+
+    async function loadWaterDispensersCSV() {
+        try {
+            const resp = await fetch('Water_Dispenser_CP.csv.csv');
+            if (!resp.ok) return [];
+            const text = await resp.text();
+            const result = Papa.parse(text, { header: true, skipEmptyLines: true });
+            const dispensers = [];
+            for (const row of result.data) {
+                let lat = parseFloat(row['Latitude'] || row['Latitude Decimal Degree(DD.DDD)'] || 0);
+                let lng = parseFloat(row['Longitude'] || row['Longitude Decimal Degree(DD.DDD)'] || 0);
+                if (lat && lng && !isNaN(lat) && !isNaN(lng) && lat !== 0) {
+                    dispensers.push({ lat, lng });
+                }
+            }
+            return dispensers;
+        } catch(e) { return []; }
+    }
+
+    function buildParkChineseMap() {
+        const mapping = {
+            "SAI KUNG EAST COUNTRY PARK": "西貢東郊野公園",
+            "SAI KUNG WEST COUNTRY PARK": "西貢西郊野公園",
+            "PAT SIN LENG COUNTRY PARK": "八仙嶺郊野公園",
+            "MA ON SHAN COUNTRY PARK": "馬鞍山郊野公園",
+            "LION ROCK COUNTRY PARK": "獅子山郊野公園",
+            "SHING MUN COUNTRY PARK": "城門郊野公園",
+            "TAI LAM COUNTRY PARK": "大欖郊野公園",
+            "TAI MO SHAN COUNTRY PARK": "大帽山郊野公園",
+            "KAM SHAN COUNTRY PARK": "金山郊野公園",
+            "PLOVER COVE COUNTRY PARK": "船灣郊野公園",
+            "LANTAU SOUTH COUNTRY PARK": "南大嶼郊野公園",
+            "LANTAU NORTH COUNTRY PARK": "北大嶼郊野公園",
+            "CLEAR WATER BAY COUNTRY PARK": "清水灣郊野公園",
+            "ABERDEEN COUNTRY PARK": "香港仔郊野公園",
+            "POK FU LAM COUNTRY PARK": "薄扶林郊野公園",
+            "LUNG FU SHAN COUNTRY PARK": "龍虎山郊野公園",
+            "TAI TAM COUNTRY PARK": "大潭郊野公園",
+            "SHEK O COUNTRY PARK": "石澳郊野公園",
+            "TUNG LUNG FORT SPECIAL AREA": "東龍洲特別地區",
+            "TSIU HANG SPECIAL AREA": "蕉坑特別地區",
+            "TAI PO KAU NATURE RESERVE": "大埔滘自然護理區"
+        };
+        for (let [eng, chi] of Object.entries(mapping)) {
+            parkChineseMap.set(eng, chi);
+        }
+    }
+
+    async function init() {
+        buildParkChineseMap();
+        const campsRaw = await loadCampsitesCSV();
+        allToilets = await loadToiletsCSV();
+        allWaterDispensers = await loadWaterDispensersCSV();
+
+        for (let camp of campsRaw) {
+            const nearby = calculateNearbyFacilities(camp, allToilets, allWaterDispensers);
+            camp.nearbyToilets = nearby.nearbyToilets;
+            camp.nearbyWaterDispenser = nearby.nearbyWater;
+            if (camp.name.includes("西灣") || camp.name.includes("鹹田")) camp.popularityIndex = 92;
+            else if (camp.name.includes("鶴藪")) camp.popularityIndex = 78;
+            else if (camp.name.includes("昂平")) camp.popularityIndex = 72;
+            else if (camp.name.includes("灣仔")) camp.popularityIndex = 85;
+            else if (camp.name.includes("大網仔")) camp.popularityIndex = 65;
+            else if (camp.name.includes("涌背")) camp.popularityIndex = 60;
+            else if (camp.name.includes("南山")) camp.popularityIndex = 70;
+            else if (camp.name.includes("荃錦")) camp.popularityIndex = 68;
+            else camp.popularityIndex = 55;
+            campsiteDatabase[camp.id] = camp;
+        }
+        allCampsites = Object.values(campsiteDatabase);
+        
+        const parkSelect = document.getElementById("parkSelect");
+        parkSelect.innerHTML = `<option value="all">${langData[currentLang].defaultParkName}</option>`;
+        const sortedParks = Array.from(parksSet).sort();
+        for (let p of sortedParks) {
+            const option = document.createElement("option");
+            option.value = p;
+            option.textContent = getDisplayParkName(p);
+            parkSelect.appendChild(option);
+        }
+        updateCampsiteDropdown("all");
+        bindParkSelectEvent();
+        bindCampSelectEvent();
+        updateStaticText();
+    }
+
+    function updateStaticText() {
+        const t = langData[currentLang];
+        document.getElementById("langSwitchBtn").innerHTML = t.switchBtn;
+        document.getElementById("headerTitle").innerHTML = t.headerTitle;
+        document.getElementById("headerSub").innerHTML = t.headerSub;
+        document.getElementById("headerBadge").innerHTML = t.headerBadge;
+        document.getElementById("parkFilterIcon").innerHTML = t.parkFilterIcon;
+        document.getElementById("parkFilterLabel").innerHTML = t.parkFilterLabel;
+        document.getElementById("campIcon").innerHTML = t.campIcon;
+        document.getElementById("campLabel").innerHTML = t.campLabel;
+        document.getElementById("pressureLabel").innerHTML = t.pressureLabel;
+        document.getElementById("statsTitle").innerHTML = t.statsTitle;
+        document.getElementById("footerText").innerHTML = t.footer;
+        
+        const parkSelect = document.getElementById("parkSelect");
+        const currentParkVal = parkSelect.value;
+        parkSelect.innerHTML = `<option value="all">${t.defaultParkName}</option>`;
+        const sortedParks = Array.from(parksSet).sort();
+        for (let p of sortedParks) {
+            const option = document.createElement("option");
+            option.value = p;
+            option.textContent = getDisplayParkName(p);
+            parkSelect.appendChild(option);
+        }
+        parkSelect.value = currentParkVal;
+        const campSelect = document.getElementById("campsiteSelect");
+        if (campSelect && campSelect.value) {
+            updateUIForCamp(campSelect.value);
+        } else {
+            updateCampsiteDropdown(currentParkVal);
+        }
+    }
+
+    function switchLanguage() {
+        currentLang = currentLang === "zh" ? "en" : "zh";
+        updateStaticText();
+    }
+
+    document.getElementById("langSwitchBtn").addEventListener("click", switchLanguage);
+    init();
+</script>
+</body>
+</html>
